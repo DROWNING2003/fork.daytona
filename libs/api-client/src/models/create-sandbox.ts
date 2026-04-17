@@ -18,6 +18,9 @@
 import type { CreateBuildInfo } from './create-build-info';
 // May contain unused imports in some cases
 // @ts-ignore
+import type { SandboxFileMount } from './sandbox-file-mount';
+// May contain unused imports in some cases
+// @ts-ignore
 import type { SandboxVolume } from './sandbox-volume';
 
 /**
@@ -135,6 +138,12 @@ export interface CreateSandbox {
      */
     'volumes'?: Array<SandboxVolume>;
     /**
+     * Files to mount into sandbox after creation
+     * @type {Array<SandboxFileMount>}
+     * @memberof CreateSandbox
+     */
+    'fileMounts'?: Array<SandboxFileMount>;
+    /**
      * Build information for the sandbox
      * @type {CreateBuildInfo}
      * @memberof CreateSandbox
@@ -149,5 +158,4 @@ export const CreateSandboxClassEnum = {
 } as const;
 
 export type CreateSandboxClassEnum = typeof CreateSandboxClassEnum[keyof typeof CreateSandboxClassEnum];
-
 

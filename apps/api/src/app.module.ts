@@ -46,6 +46,7 @@ import { BodyParserErrorModule } from './common/modules/body-parser-error.module
 import { AdminModule } from './admin/admin.module'
 import { ClickHouseModule } from './clickhouse/clickhouse.module'
 import { SandboxTelemetryModule } from './sandbox-telemetry/sandbox-telemetry.module'
+import { AgentRuntimeModule } from './agent-runtime/agent-runtime.module'
 
 @Module({
   imports: [
@@ -194,6 +195,7 @@ import { SandboxTelemetryModule } from './sandbox-telemetry/sandbox-telemetry.mo
     NotificationModule,
     WebhookModule,
     ObjectStorageModule,
+    AgentRuntimeModule,
     AuditModule,
     HealthModule,
     ClickHouseModule,

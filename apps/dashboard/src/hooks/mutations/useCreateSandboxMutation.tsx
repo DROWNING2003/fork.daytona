@@ -11,6 +11,11 @@ import { getSandboxesQueryKey } from '../useSandboxes'
 
 export type CreateSandboxParams = (CreateSandboxFromSnapshotParams | CreateSandboxFromImageParams) & {
   target?: string
+  fileMounts?: Array<{
+    fileId: string
+    targetPath: string
+    access?: 'read_only' | 'read_write'
+  }>
 }
 
 export const useCreateSandboxMutation = () => {

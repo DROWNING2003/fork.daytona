@@ -133,10 +133,16 @@ func run() int {
 		return 2
 	}
 
-	pluginPath, err := daemon.WriteStaticBinary("daytona-computer-use")
+	pluginPath := ""
+	pluginPath, err = daemon.WriteStaticBinary("daytona-computer-use")
 	if err != nil {
-		logger.Error("Error writing plugin binary", "error", err)
-		return 2
+		skipComputerUseBuild := os.Getenv("SKIP_COMPUTER_USE_BUILD") != ""
+		if skipComputerUseBuild && os.IsNotExist(err) {
+			logger.Warn("Skipping computer-use plugin binary because SKIP_COMPUTER_USE_BUILD is set", "error", err)
+		} else {
+			logger.Error("Error writing plugin binary", "error", err)
+			return 2
+		}
 	}
 
 	backupInfoCache := cache.NewBackupInfoCache(ctx, cfg.BackupInfoCacheRetention)

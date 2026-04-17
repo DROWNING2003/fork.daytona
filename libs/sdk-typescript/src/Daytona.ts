@@ -135,6 +135,12 @@ export interface Resources {
   disk?: number
 }
 
+export type FileMount = {
+  fileId: string
+  targetPath: string
+  access?: 'read_only' | 'read_write'
+}
+
 /**
  * Base parameters for creating a new Sandbox.
  *
@@ -148,6 +154,7 @@ export interface Resources {
  * @property {number} [autoArchiveInterval] - Auto-archive interval in minutes (0 means the maximum interval will be used). Default is 7 days.
  * @property {number} [autoDeleteInterval] - Auto-delete interval in minutes (negative value means disabled, 0 means delete immediately upon stopping). By default, auto-delete is disabled.
  * @property {VolumeMount[]} [volumes] - Optional array of volumes to mount to the Sandbox
+ * @property {FileMount[]} [fileMounts] - Optional array of single files to mount to the Sandbox
  * @property {boolean} [networkBlockAll] - Whether to block all network access for the Sandbox
  * @property {string} [networkAllowList] - Comma-separated list of allowed CIDR network addresses for the Sandbox
  * @property {boolean} [ephemeral] - Whether the Sandbox should be ephemeral. If true, autoDeleteInterval will be set to 0.
@@ -163,6 +170,7 @@ export type CreateSandboxBaseParams = {
   autoArchiveInterval?: number
   autoDeleteInterval?: number
   volumes?: VolumeMount[]
+  fileMounts?: FileMount[]
   networkBlockAll?: boolean
   networkAllowList?: string
   ephemeral?: boolean
@@ -529,6 +537,7 @@ export class Daytona implements AsyncDisposable {
           autoArchiveInterval: params.autoArchiveInterval,
           autoDeleteInterval: params.autoDeleteInterval,
           volumes: params.volumes,
+          fileMounts: params.fileMounts,
           networkBlockAll: params.networkBlockAll,
           networkAllowList: params.networkAllowList,
         },
@@ -617,7 +626,12 @@ export class Daytona implements AsyncDisposable {
     const response = await this.sandboxApi.getSandbox(sandboxIdOrName)
     const sandboxInstance = response.data
 
-    return new Sandbox(sandboxInstance, structuredClone(this.clientConfig), Daytona.createAxiosInstance(), this.sandboxApi)
+    return new Sandbox(
+      sandboxInstance,
+      structuredClone(this.clientConfig),
+      Daytona.createAxiosInstance(),
+      this.sandboxApi,
+    )
   }
 
   /**

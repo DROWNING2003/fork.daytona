@@ -117,15 +117,33 @@ func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxD
 		return "", "", err
 	}
 
-	volumeMountPathBinds := make([]string, 0)
+	mountPathBinds := make([]string, 0)
 	if sandboxDto.Volumes != nil {
-		volumeMountPathBinds, err = d.getVolumesMountPathBinds(ctx, sandboxDto.Volumes)
+		volumeMountPathBinds, err := d.getVolumesMountPathBinds(ctx, sandboxDto.Volumes)
 		if err != nil {
 			return "", "", err
 		}
+		mountPathBinds = append(mountPathBinds, volumeMountPathBinds...)
 	}
 
-	containerConfig, hostConfig, networkingConfig, err := d.getContainerConfigs(sandboxDto, image, volumeMountPathBinds)
+	if fileMountsJSON, ok := sandboxDto.Metadata["fileMounts"]; ok {
+		var fileMounts []fileMountMetadata
+		if err := json.Unmarshal([]byte(fileMountsJSON), &fileMounts); err != nil {
+			return "", "", fmt.Errorf("failed to parse fileMounts metadata: %w", err)
+		}
+		fileMountPathBinds, fileMountStates, err := d.prepareFileMounts(ctx, fileMounts)
+		if err != nil {
+			return "", "", err
+		}
+		mountPathBinds = append(mountPathBinds, fileMountPathBinds...)
+		if len(fileMountStates) > 0 {
+			if err := persistFileMountState(sandboxDto.Id, fileMountStates); err != nil {
+				return "", "", err
+			}
+		}
+	}
+
+	containerConfig, hostConfig, networkingConfig, err := d.getContainerConfigs(sandboxDto, image, mountPathBinds)
 	if err != nil {
 		return "", "", err
 	}

@@ -20,7 +20,7 @@ import { SandboxDesiredState } from '../enums/sandbox-desired-state.enum'
 import { SandboxClass } from '../enums/sandbox-class.enum'
 import { BackupState } from '../enums/backup-state.enum'
 import { v4 as uuidv4 } from 'uuid'
-import { SandboxVolume } from '../dto/sandbox.dto'
+import { SandboxFileMount, SandboxVolume } from '../dto/sandbox.dto'
 import { BuildInfo } from './build-info.entity'
 import { nanoid } from 'nanoid'
 import { SandboxLastActivity } from './sandbox-last-activity.entity'
@@ -48,6 +48,7 @@ import { SandboxLastActivity } from './sandbox-last-activity.entity'
 @Index('idx_sandbox_authtoken', ['authToken'])
 @Index('sandbox_labels_gin_full_idx', { synchronize: false })
 @Index('idx_sandbox_volumes_gin', { synchronize: false })
+@Index('idx_sandbox_file_mounts_gin', { synchronize: false })
 export class Sandbox {
   @PrimaryColumn({ default: () => 'uuid_generate_v4()' })
   id: string
@@ -176,6 +177,12 @@ export class Sandbox {
     default: [],
   })
   volumes: SandboxVolume[] = []
+
+  @Column({
+    type: 'jsonb',
+    default: [],
+  })
+  fileMounts: SandboxFileMount[] = []
 
   @CreateDateColumn({
     type: 'timestamp with time zone',

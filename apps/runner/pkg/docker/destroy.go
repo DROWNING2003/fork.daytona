@@ -35,6 +35,7 @@ func (d *DockerClient) Destroy(ctx context.Context, containerId string) error {
 	ct, err := d.ContainerInspect(ctx, containerId)
 	if err != nil {
 		if common_errors.IsNotFoundError(err) {
+			clearFileMountState(containerId)
 			return nil
 		}
 		return err
@@ -44,6 +45,7 @@ func (d *DockerClient) Destroy(ctx context.Context, containerId string) error {
 	state, _ := d.getSandboxState(ct)
 	if state == enums.SandboxStateDestroyed || state == enums.SandboxStateDestroying {
 		d.logger.DebugContext(ctx, "Sandbox is already destroyed or destroying", "containerId", containerId)
+		clearFileMountState(containerId)
 		return nil
 	}
 
@@ -53,6 +55,10 @@ func (d *DockerClient) Destroy(ctx context.Context, containerId string) error {
 			RemoveVolumes: true,
 		})
 		if err == nil {
+			if err := d.syncFileMountsToS3(ctx, containerId); err != nil {
+				return fmt.Errorf("error syncing file mounts for sandbox %s: %w", containerId, err)
+			}
+			clearFileMountState(containerId)
 			go func() {
 				containerShortId := ct.ID[:12]
 				err := d.netRulesManager.DeleteNetworkRules(containerShortId)
@@ -66,6 +72,7 @@ func (d *DockerClient) Destroy(ctx context.Context, containerId string) error {
 
 		// Handle not found case
 		if errdefs.IsNotFound(err) {
+			clearFileMountState(containerId)
 			return nil
 		}
 
@@ -89,10 +96,16 @@ func (d *DockerClient) Destroy(ctx context.Context, containerId string) error {
 	if err != nil {
 		// Handle NotFound error case
 		if errdefs.IsNotFound(err) {
+			clearFileMountState(containerId)
 			return nil
 		}
 		return err
 	}
+
+	if err := d.syncFileMountsToS3(ctx, containerId); err != nil {
+		return fmt.Errorf("error syncing file mounts for sandbox %s: %w", containerId, err)
+	}
+	clearFileMountState(containerId)
 
 	go func() {
 		containerShortId := ct.ID[:12]

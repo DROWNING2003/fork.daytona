@@ -296,6 +296,9 @@ export class SandboxController {
     let sandbox: SandboxDto
 
     if (createSandboxDto.buildInfo) {
+      if (createSandboxDto.fileMounts?.length) {
+        throw new BadRequestError('fileMounts are not supported when using buildInfo')
+      }
       if (createSandboxDto.snapshot) {
         throw new BadRequestError('Cannot specify a snapshot when using a build info entry')
       }

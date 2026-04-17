@@ -21,9 +21,9 @@ import {
 } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FeatureFlags } from '@/enums/FeatureFlags'
 import { RoutePath } from '@/enums/RoutePath'
 import { useCreateSandboxMutation } from '@/hooks/mutations/useCreateSandboxMutation'
+import { useAuth } from 'react-oidc-context'
 import { useSnapshotsQuery } from '@/hooks/queries/useSnapshotsQuery'
 import { useConfig } from '@/hooks/useConfig'
 import { useRegions } from '@/hooks/useRegions'
@@ -35,7 +35,6 @@ import { cn, getRegionFullDisplayName } from '@/lib/utils'
 import { Sandbox } from '@daytona/sdk'
 import { useForm } from '@tanstack/react-form'
 import { Info, Minus, Plus, Upload } from 'lucide-react'
-import { useFeatureFlagEnabled } from 'posthog-js/react'
 import { ComponentProps, Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { NumericFormat } from 'react-number-format'
 import { createSearchParams, generatePath, useNavigate } from 'react-router-dom'
@@ -51,6 +50,18 @@ const NONE_VALUE = '__none__'
 enum Source {
   SNAPSHOT = 'snapshot',
   IMAGE = 'image',
+}
+
+type UploadedFile = {
+  id: string
+  filename: string
+  size_bytes: number
+}
+
+type FileMountFormValue = {
+  fileId: string
+  targetPath: string
+  access: 'read_only' | 'read_write'
 }
 
 const keyValuePairSchema = z.object({
@@ -147,8 +158,11 @@ const InfoTooltipButton = ({ className, ...props }: ComponentProps<'button'>) =>
 
 export const CreateSandboxSheet = ({ className, ref }: { className?: string; ref?: Ref<{ open: () => void }> }) => {
   const navigate = useNavigate()
-  const createSandboxEnabled = useFeatureFlagEnabled(FeatureFlags.DASHBOARD_CREATE_SANDBOX)
   const [open, setOpen] = useState(false)
+  const { user } = useAuth()
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [fileMounts, setFileMounts] = useState<FileMountFormValue[]>([])
 
   const config = useConfig()
   const { availableRegions: regions, loadingAvailableRegions: loadingRegions } = useRegions()
@@ -214,6 +228,13 @@ export const CreateSandboxSheet = ({ className, ref }: { className?: string; ref
         labels: Object.keys(labels).length > 0 ? labels : undefined,
         public: value.public || undefined,
         networkBlockAll: value.networkBlockAll || undefined,
+        fileMounts: fileMounts
+          .filter((mount) => mount.fileId && mount.targetPath)
+          .map((mount) => ({
+            fileId: mount.fileId,
+            targetPath: mount.targetPath,
+            access: mount.access,
+          })),
       }
 
       let sandbox: Sandbox | undefined = undefined
@@ -270,6 +291,7 @@ export const CreateSandboxSheet = ({ className, ref }: { className?: string; ref
 
   const resetState = useCallback(() => {
     resetForm(defaultValues)
+    setFileMounts([])
     resetCreateSandboxMutation()
   }, [resetForm, resetCreateSandboxMutation])
 
@@ -318,9 +340,37 @@ export const CreateSandboxSheet = ({ className, ref }: { className?: string; ref
     }
   }, [open, resetState])
 
-  if (!createSandboxEnabled) {
-    return null
-  }
+  useEffect(() => {
+    const fetchFiles = async () => {
+      if (!open || !selectedOrganization?.id || !user?.access_token) {
+        return
+      }
+
+      try {
+        setLoadingFiles(true)
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/internal/files`, {
+          headers: {
+            Authorization: `Bearer ${user.access_token}`,
+            'X-Daytona-Organization-ID': selectedOrganization.id,
+          },
+        })
+
+        if (!response.ok) {
+          setUploadedFiles([])
+          return
+        }
+
+        const data = await response.json()
+        setUploadedFiles(data?.data ?? [])
+      } catch {
+        setUploadedFiles([])
+      } finally {
+        setLoadingFiles(false)
+      }
+    }
+
+    fetchFiles()
+  }, [open, selectedOrganization?.id, user?.access_token])
 
   return (
     <Sheet
@@ -902,6 +952,91 @@ export const CreateSandboxSheet = ({ className, ref }: { className?: string; ref
                   </div>
                 )}
               </form.Field>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium">文件挂载（可选）</Label>
+              <div className="flex flex-col gap-2">
+                {fileMounts.map((mount, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-4">
+                      <Select
+                        value={mount.fileId || NONE_VALUE}
+                        onValueChange={(value) => {
+                          const next = [...fileMounts]
+                          next[index] = { ...next[index], fileId: value === NONE_VALUE ? '' : value }
+                          setFileMounts(next)
+                        }}
+                      >
+                        <SelectTrigger className="h-8" disabled={loadingFiles}>
+                          <SelectValue placeholder={loadingFiles ? '加载文件中...' : '选择文件'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE_VALUE}>不选择</SelectItem>
+                          {uploadedFiles.map((file) => (
+                            <SelectItem key={file.id} value={file.id}>
+                              {file.filename}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-5">
+                      <Input
+                        placeholder="/workspace/input.txt"
+                        value={mount.targetPath}
+                        onChange={(e) => {
+                          const next = [...fileMounts]
+                          next[index] = { ...next[index], targetPath: e.target.value }
+                          setFileMounts(next)
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Select
+                        value={mount.access}
+                        onValueChange={(value) => {
+                          const next = [...fileMounts]
+                          next[index] = { ...next[index], access: value as 'read_only' | 'read_write' }
+                          setFileMounts(next)
+                        }}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="read_only">只读</SelectItem>
+                          <SelectItem value="read_write">读写</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setFileMounts((prev) => prev.filter((_, i) => i !== index))}
+                      >
+                        <Minus className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-fit"
+                  onClick={() =>
+                    setFileMounts((prev) => [...prev, { fileId: '', targetPath: '', access: 'read_only' }])
+                  }
+                >
+                  <Plus className="size-4" />
+                  添加挂载文件
+                </Button>
+                <FieldDescription>创建沙箱后会自动按 fileMounts 调用后端挂载逻辑（mount-s3）。</FieldDescription>
+              </div>
             </div>
           </form>
         </ScrollArea>

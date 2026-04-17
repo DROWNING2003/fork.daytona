@@ -474,7 +474,10 @@ export class SandboxService {
         pendingDiskIncrement = disk
       }
 
-      if (!createSandboxDto.volumes || createSandboxDto.volumes.length === 0) {
+      if (
+        (!createSandboxDto.volumes || createSandboxDto.volumes.length === 0) &&
+        (!createSandboxDto.fileMounts || createSandboxDto.fileMounts.length === 0)
+      ) {
         const skipWarmPool = (await this.redis.exists(`warm-pool:skip:${snapshot.id}`)) === 1
 
         if (!skipWarmPool) {
@@ -496,7 +499,7 @@ export class SandboxService {
             return await this.assignWarmPoolSandbox(warmPoolSandbox, createSandboxDto, organization)
           }
         }
-      } else {
+      } else if (Array.isArray(createSandboxDto.volumes) && createSandboxDto.volumes.length > 0) {
         const volumeIdOrNames = createSandboxDto.volumes.map((v) => v.volumeId)
         await this.volumeService.validateVolumes(organization.id, volumeIdOrNames)
       }
@@ -548,6 +551,9 @@ export class SandboxService {
 
       if (createSandboxDto.volumes !== undefined) {
         sandbox.volumes = this.resolveVolumes(createSandboxDto.volumes)
+      }
+      if (createSandboxDto.fileMounts !== undefined) {
+        sandbox.fileMounts = createSandboxDto.fileMounts
       }
 
       sandbox.runnerId = runner.id
@@ -604,6 +610,9 @@ export class SandboxService {
 
     if (createSandboxDto.autoDeleteInterval !== undefined) {
       updateData.autoDeleteInterval = createSandboxDto.autoDeleteInterval
+    }
+    if (createSandboxDto.fileMounts !== undefined) {
+      updateData.fileMounts = createSandboxDto.fileMounts
     }
 
     if (createSandboxDto.networkBlockAll !== undefined) {
@@ -684,7 +693,7 @@ export class SandboxService {
         pendingDiskIncrement = disk
       }
 
-      if (createSandboxDto.volumes && createSandboxDto.volumes.length > 0) {
+      if (Array.isArray(createSandboxDto.volumes) && createSandboxDto.volumes.length > 0) {
         const volumeIdOrNames = createSandboxDto.volumes.map((v) => v.volumeId)
         await this.volumeService.validateVolumes(organization.id, volumeIdOrNames)
       }
@@ -726,6 +735,9 @@ export class SandboxService {
 
       if (createSandboxDto.volumes !== undefined) {
         sandbox.volumes = this.resolveVolumes(createSandboxDto.volumes)
+      }
+      if (createSandboxDto.fileMounts !== undefined) {
+        sandbox.fileMounts = createSandboxDto.fileMounts
       }
 
       const buildInfoSnapshotRef = generateBuildSnapshotRef(
@@ -873,6 +885,7 @@ export class SandboxService {
       forkedSandbox.autoArchiveInterval = sourceSandbox.autoArchiveInterval
       forkedSandbox.autoDeleteInterval = sourceSandbox.autoDeleteInterval
       forkedSandbox.volumes = sourceSandbox.volumes?.map((volume) => ({ ...volume }))
+      forkedSandbox.fileMounts = sourceSandbox.fileMounts?.map((mount) => ({ ...mount }))
       forkedSandbox.networkBlockAll = sourceSandbox.networkBlockAll
       forkedSandbox.networkAllowList = sourceSandbox.networkAllowList
       forkedSandbox.runnerId = sourceSandbox.runnerId

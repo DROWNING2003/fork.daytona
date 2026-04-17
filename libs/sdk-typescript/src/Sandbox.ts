@@ -9,6 +9,7 @@ import {
   Sandbox as SandboxDto,
   PaginatedSandboxes as PaginatedSandboxesDto,
   PortPreviewUrl,
+  SandboxFileMount,
   SandboxVolume,
   BuildInfo,
   SandboxBackupStateEnum,
@@ -71,6 +72,7 @@ import { WithInstrumentation } from './utils/otel.decorator'
  * @property {number} [autoArchiveInterval] - Auto-archive interval in minutes
  * @property {number} [autoDeleteInterval] - Auto-delete interval in minutes
  * @property {Array<SandboxVolume>} [volumes] - Volumes attached to the Sandbox
+ * @property {Array<SandboxFileMount>} [fileMounts] - Single-file mounts attached to the Sandbox
  * @property {BuildInfo} [buildInfo] - Build information for the Sandbox if it was created from dynamic build
  * @property {string} [createdAt] - When the Sandbox was created
  * @property {string} [updatedAt] - When the Sandbox was last updated
@@ -108,6 +110,7 @@ export class Sandbox implements SandboxDto {
   public autoArchiveInterval?: number
   public autoDeleteInterval?: number
   public volumes?: Array<SandboxVolume>
+  public fileMounts?: Array<SandboxFileMount>
   public buildInfo?: BuildInfo
   public createdAt?: string
   public updatedAt?: string
@@ -843,6 +846,7 @@ export class Sandbox implements SandboxDto {
     this.autoArchiveInterval = sandboxDto.autoArchiveInterval
     this.autoDeleteInterval = sandboxDto.autoDeleteInterval
     this.volumes = sandboxDto.volumes
+    this.fileMounts = sandboxDto.fileMounts
     this.buildInfo = sandboxDto.buildInfo
     this.createdAt = sandboxDto.createdAt
     this.updatedAt = sandboxDto.updatedAt

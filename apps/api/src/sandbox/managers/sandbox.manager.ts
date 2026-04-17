@@ -5,7 +5,7 @@
 
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { In, IsNull, Not } from 'typeorm'
+import { DataSource, In, IsNull, Not, Repository } from 'typeorm'
 import { randomUUID } from 'crypto'
 
 import { SandboxConflictError } from '../errors/sandbox-conflict.error'
@@ -51,8 +51,8 @@ import { TypedConfigService } from '../../config/typed-config.service'
 import { BackupManager } from './backup.manager'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import Redis from 'ioredis'
-import { InjectDataSource } from '@nestjs/typeorm'
-import { DataSource } from 'typeorm'
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
+import { FileObject } from '../../agent-runtime/entities/file-object.entity'
 
 @Injectable()
 export class SandboxManager implements TrackableJobExecutions, OnApplicationShutdown {
@@ -75,6 +75,8 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
     private readonly backupManager: BackupManager,
     @InjectRedis() private readonly redis: Redis,
     @InjectDataSource() private readonly dataSource: DataSource,
+    @InjectRepository(FileObject)
+    private readonly fileObjectRepository: Repository<FileObject>,
   ) {}
 
   async onApplicationShutdown() {
@@ -575,6 +577,34 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
     const metadata = {
       ...organization?.sandboxMetadata,
       sandboxName: sandbox.name,
+    }
+    if (sandbox.fileMounts?.length) {
+      const uniqueFileIds = [...new Set(sandbox.fileMounts.map((m) => m.fileId).filter(Boolean))]
+      const files = await this.fileObjectRepository.find({
+        where: {
+          id: In(uniqueFileIds),
+          organizationId: sandbox.organizationId,
+          deletedAt: IsNull(),
+        },
+        select: ['id', 'filename', 'storageBucket', 'storageKey'],
+      })
+      const fileById = new Map(files.map((f) => [f.id, f]))
+      metadata['fileMounts'] = JSON.stringify(
+        sandbox.fileMounts.map((mount) => {
+          const file = fileById.get(mount.fileId)
+          if (!file) {
+            throw new Error(`File not found: ${mount.fileId}`)
+          }
+          return {
+            fileId: mount.fileId,
+            filename: file.filename,
+            targetPath: mount.targetPath,
+            access: mount.access || 'read_only',
+            bucket: file.storageBucket,
+            key: file.storageKey,
+          }
+        }),
+      )
     }
 
     const newRunner = await this.runnerService.findOneOrFail(newRunnerId)

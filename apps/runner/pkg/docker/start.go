@@ -56,6 +56,21 @@ func (d *DockerClient) Start(ctx context.Context, containerId string, authToken 
 		}
 	}
 
+	// Ensure single-file mount sources exist on host before container start.
+	if fileMountsJSON, ok := metadata["fileMounts"]; ok {
+		var fileMounts []fileMountMetadata
+		if err := json.Unmarshal([]byte(fileMountsJSON), &fileMounts); err == nil && len(fileMounts) > 0 {
+			_, fileMountStates, err := d.prepareFileMounts(ctx, fileMounts)
+			if err != nil {
+				d.logger.ErrorContext(ctx, "Failed to ensure file mount sources", "error", err)
+			} else if len(fileMountStates) > 0 {
+				if err := persistFileMountState(containerId, fileMountStates); err != nil {
+					d.logger.ErrorContext(ctx, "Failed to persist file mount state", "error", err)
+				}
+			}
+		}
+	}
+
 	err = d.apiClient.ContainerStart(ctx, containerId, container.StartOptions{})
 	if err != nil {
 		return nil, "", err

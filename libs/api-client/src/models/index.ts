@@ -134,6 +134,7 @@ export * from './runner-state';
 export * from './sandbox';
 export * from './sandbox-class';
 export * from './sandbox-desired-state';
+export * from './sandbox-file-mount';
 export * from './sandbox-info';
 export * from './sandbox-labels';
 export * from './sandbox-state';

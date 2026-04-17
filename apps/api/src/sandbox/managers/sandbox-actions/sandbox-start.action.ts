@@ -30,6 +30,9 @@ import { InjectRedis } from '@nestjs-modules/ioredis'
 import Redis from 'ioredis'
 import { WithSpan } from '../../../common/decorators/otel.decorator'
 import { SandboxActivityService } from '../../services/sandbox-activity.service'
+import { InjectRepository } from '@nestjs/typeorm'
+import { FileObject } from '../../../agent-runtime/entities/file-object.entity'
+import { In, IsNull, Repository } from 'typeorm'
 
 @Injectable()
 export class SandboxStartAction extends SandboxAction {
@@ -45,6 +48,8 @@ export class SandboxStartAction extends SandboxAction {
     protected readonly redisLockProvider: RedisLockProvider,
     @InjectRedis() private readonly redis: Redis,
     private readonly sandboxActivityService: SandboxActivityService,
+    @InjectRepository(FileObject)
+    private readonly fileObjectRepository: Repository<FileObject>,
   ) {
     super(runnerService, runnerAdapterFactory, sandboxRepository, redisLockProvider)
   }
@@ -386,6 +391,10 @@ export class SandboxStartAction extends SandboxAction {
       ...organization?.sandboxMetadata,
       sandboxName: sandbox.name,
     }
+    const fileMountsMetadata = await this.buildFileMountsMetadata(sandbox)
+    if (fileMountsMetadata) {
+      metadata['fileMounts'] = fileMountsMetadata
+    }
 
     const result = await runnerAdapter.createSandbox(
       sandbox,
@@ -511,6 +520,10 @@ export class SandboxStartAction extends SandboxAction {
         metadata['volumes'] = JSON.stringify(
           sandbox.volumes.map((v) => ({ volumeId: v.volumeId, mountPath: v.mountPath, subpath: v.subpath })),
         )
+      }
+      const fileMountsMetadata = await this.buildFileMountsMetadata(sandbox)
+      if (fileMountsMetadata) {
+        metadata['fileMounts'] = fileMountsMetadata
       }
 
       try {
@@ -828,6 +841,10 @@ export class SandboxStartAction extends SandboxAction {
       ...organization?.sandboxMetadata,
       sandboxName: sandbox.name,
     }
+    const fileMountsMetadata = await this.buildFileMountsMetadata(sandbox)
+    if (fileMountsMetadata) {
+      metadata['fileMounts'] = fileMountsMetadata
+    }
 
     await runnerAdapter.createSandbox(
       sandbox,
@@ -838,6 +855,45 @@ export class SandboxStartAction extends SandboxAction {
       this.configService.get('otelCollector.endpointUrl'),
     )
     return null
+  }
+
+  private async buildFileMountsMetadata(sandbox: Sandbox): Promise<string | undefined> {
+    if (!sandbox.fileMounts?.length) {
+      return undefined
+    }
+
+    const uniqueFileIds = [...new Set(sandbox.fileMounts.map((m) => m.fileId).filter(Boolean))]
+    if (uniqueFileIds.length === 0) {
+      return undefined
+    }
+
+    const files = await this.fileObjectRepository.find({
+      where: {
+        id: In(uniqueFileIds),
+        organizationId: sandbox.organizationId,
+        deletedAt: IsNull(),
+      },
+      select: ['id', 'filename', 'storageBucket', 'storageKey'],
+    })
+
+    const fileById = new Map(files.map((f) => [f.id, f]))
+    const mounts = sandbox.fileMounts.map((mount) => {
+      const file = fileById.get(mount.fileId)
+      if (!file) {
+        throw new NotFoundException(`File not found: ${mount.fileId}`)
+      }
+
+      return {
+        fileId: mount.fileId,
+        filename: file.filename,
+        targetPath: mount.targetPath,
+        access: mount.access || 'read_only',
+        bucket: file.storageBucket,
+        key: file.storageKey,
+      }
+    })
+
+    return JSON.stringify(mounts)
   }
 
   private async removeSandboxFromPreviousRunner(sandbox: Sandbox): Promise<void> {

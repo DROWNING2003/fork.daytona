@@ -60,11 +60,14 @@ import { SshGatewayAuthContextGuard } from './guards/ssh-gateway-auth-context.gu
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { SandboxLastActivity } from './entities/sandbox-last-activity.entity'
 import { SandboxActivityService } from './services/sandbox-activity.service'
+import { AgentRuntimeModule } from '../agent-runtime/agent-runtime.module'
+import { FileObject } from '../agent-runtime/entities/file-object.entity'
 
 @Module({
   imports: [
     UserModule,
     DockerRegistryModule,
+    AgentRuntimeModule,
     OrganizationModule,
     RegionModule,
     TypeOrmModule.forFeature([
@@ -82,6 +85,7 @@ import { SandboxActivityService } from './services/sandbox-activity.service'
       Job,
       SandboxLastActivity,
       SandboxFork,
+      FileObject,
     ]),
   ],
   controllers: [

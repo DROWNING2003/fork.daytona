@@ -18,6 +18,9 @@
 import type { BuildInfo } from './build-info';
 // May contain unused imports in some cases
 // @ts-ignore
+import type { SandboxFileMount } from './sandbox-file-mount';
+// May contain unused imports in some cases
+// @ts-ignore
 import type { SandboxDesiredState } from './sandbox-desired-state';
 // May contain unused imports in some cases
 // @ts-ignore
@@ -183,6 +186,12 @@ export interface Sandbox {
      */
     'volumes'?: Array<SandboxVolume>;
     /**
+     * Array of single-file mounts attached to the sandbox
+     * @type {Array<SandboxFileMount>}
+     * @memberof Sandbox
+     */
+    'fileMounts'?: Array<SandboxFileMount>;
+    /**
      * Build information for the sandbox
      * @type {BuildInfo}
      * @memberof Sandbox
@@ -243,5 +252,4 @@ export const SandboxClassEnum = {
 } as const;
 
 export type SandboxClassEnum = typeof SandboxClassEnum[keyof typeof SandboxClassEnum];
-
 

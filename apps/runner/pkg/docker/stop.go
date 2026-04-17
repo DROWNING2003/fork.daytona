@@ -16,6 +16,9 @@ func (d *DockerClient) Stop(ctx context.Context, containerId string, force bool)
 	// Deduce sandbox state first
 	state, err := d.GetSandboxState(ctx, containerId)
 	if err == nil && state == enums.SandboxStateStopped {
+		if err := d.syncFileMountsToS3(ctx, containerId); err != nil {
+			return fmt.Errorf("error syncing file mounts for sandbox %s: %w", containerId, err)
+		}
 		d.logger.DebugContext(ctx, "Sandbox is already stopped", "containerId", containerId)
 		return nil
 	}
@@ -46,15 +49,18 @@ func (d *DockerClient) Stop(ctx context.Context, containerId string, force bool)
 	// Wait for container to actually stop
 	statusCh, errCh := d.apiClient.ContainerWait(ctx, containerId, container.WaitConditionNotRunning)
 	select {
-	case err := <-errCh:
-		if err != nil {
-			return fmt.Errorf("error waiting for sandbox %s to stop: %w", containerId, err)
+	case waitErr := <-errCh:
+		if waitErr != nil {
+			return fmt.Errorf("error waiting for sandbox %s to stop: %w", containerId, waitErr)
 		}
 	case <-statusCh:
 		// Container stopped successfully
-		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+
+	if err := d.syncFileMountsToS3(ctx, containerId); err != nil {
+		return fmt.Errorf("error syncing file mounts for sandbox %s: %w", containerId, err)
 	}
 
 	d.logger.DebugContext(ctx, "Sandbox stopped successfully", "containerId", containerId)

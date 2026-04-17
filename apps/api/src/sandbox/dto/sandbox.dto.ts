@@ -34,6 +34,28 @@ export class SandboxVolume {
   subpath?: string
 }
 
+@ApiSchema({ name: 'SandboxFileMount' })
+export class SandboxFileMount {
+  @ApiProperty({
+    description: 'The uploaded file ID to mount',
+    example: 'file_abc123',
+  })
+  fileId: string
+
+  @ApiProperty({
+    description: 'Absolute target directory in sandbox; filename will be appended automatically',
+    example: '/workspace/data',
+  })
+  targetPath: string
+
+  @ApiPropertyOptional({
+    description: 'Mount access mode',
+    enum: ['read_only', 'read_write'],
+    example: 'read_only',
+  })
+  access?: 'read_only' | 'read_write'
+}
+
 @ApiSchema({ name: 'Sandbox' })
 export class SandboxDto {
   @ApiProperty({
@@ -220,6 +242,14 @@ export class SandboxDto {
   volumes?: SandboxVolume[]
 
   @ApiPropertyOptional({
+    description: 'Array of single-file mounts attached to the sandbox',
+    type: [SandboxFileMount],
+    required: false,
+  })
+  @IsOptional()
+  fileMounts?: SandboxFileMount[]
+
+  @ApiPropertyOptional({
     description: 'Build information for the sandbox',
     type: BuildInfoDto,
     required: false,
@@ -294,6 +324,7 @@ export class SandboxDto {
       networkAllowList: sandbox.networkAllowList,
       labels: sandbox.labels,
       volumes: sandbox.volumes,
+      fileMounts: sandbox.fileMounts,
       state: this.getSandboxState(sandbox),
       desiredState: sandbox.desiredState,
       errorReason: sandbox.errorReason,

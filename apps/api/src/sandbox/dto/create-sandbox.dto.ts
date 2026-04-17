@@ -6,7 +6,7 @@
 import { IsEnum, IsObject, IsOptional, IsString, IsNumber, IsBoolean, IsArray } from 'class-validator'
 import { ApiPropertyOptional, ApiSchema } from '@nestjs/swagger'
 import { SandboxClass } from '../enums/sandbox-class.enum'
-import { SandboxVolume } from './sandbox.dto'
+import { SandboxFileMount, SandboxVolume } from './sandbox.dto'
 import { CreateBuildInfoDto } from './create-build-info.dto'
 import { IsSafeDisplayString } from '../../common/validators'
 
@@ -178,4 +178,12 @@ export class CreateSandboxDto {
   @IsOptional()
   @IsObject()
   buildInfo?: CreateBuildInfoDto
+
+  @ApiPropertyOptional({
+    description: 'Files to mount into sandbox; each targetPath is treated as a directory',
+    type: [SandboxFileMount],
+  })
+  @IsOptional()
+  @IsArray()
+  fileMounts?: SandboxFileMount[]
 }
