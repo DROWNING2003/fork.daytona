@@ -348,7 +348,7 @@ export const CreateSandboxSheet = ({ className, ref }: { className?: string; ref
 
       try {
         setLoadingFiles(true)
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/internal/files`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/files`, {
           headers: {
             Authorization: `Bearer ${user.access_token}`,
             'X-Daytona-Organization-ID': selectedOrganization.id,
