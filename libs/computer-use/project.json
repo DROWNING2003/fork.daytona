@@ -24,7 +24,7 @@
     "build-amd64": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "./hack/computer-use/build-computer-use-amd64.sh"
+        "command": "if [ -n \"$SKIP_COMPUTER_USE_BUILD\" ]; then echo 'Skipping computer-use build'; else ./hack/computer-use/build-computer-use-amd64.sh; fi"
       },
       "configurations": {
         "production": {
